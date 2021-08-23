@@ -36,6 +36,7 @@ for file in os.listdir("rawData/onlinelearning/engagement_data"):
 
 # Change 'District Of Columbia' to match with other df
 allOnline["state"].replace({"District Of Columbia": "District of Columbia"}, inplace=True)
+allOnline = allOnline.drop_duplicates(subset=['state', "date"])
 
 #### COVID-19 cases ####
 ## Create new dataframe where all information will be placed
@@ -53,6 +54,8 @@ for file in os.listdir("rawData/csse_covid_19_daily_reports_us"):
     data["date"] = date.strftime("%Y-%m-%d") # add date as column
     data.columns = ["state", "confirmed", "deaths", "recovered", "active", "date"]
     allCases = allCases.append(data) # add rows to df
+
+allCases = allCases.drop_duplicates(subset=['state', "date"])
 
 
 # display states not in both df
@@ -72,7 +75,7 @@ vac = vac.drop(['UID', 'iso2', 'iso3', 'code3', 'FIPS', 'Admin2', 'Country_Regio
 vac_states = vac["Province_State"].unique()
 vac_cols = vac.columns.tolist()
 
-vals = pd.DataFrame(columns=["State", "Doses", "Population"]) # all rows to be added
+vals = pd.DataFrame(columns=["state", "doses", "date"]) # all rows to be added
 for index, row in allData.iterrows():
     if row["state"] in vac_states and row["date"] in vac_cols:
         thisRow = vac[vac["Province_State"] == row["state"]]
@@ -81,4 +84,14 @@ for index, row in allData.iterrows():
             doses = int(doses)
         except:
             doses = 0
-        vals = vals.append({"state": row["state"], "doses": doses, "population": thisRow["Population"]})
+        vals = vals.append({"state": row["state"], "date": row["date"], "doses": doses}, ignore_index=True)
+    elif row["state"] in vac_states:
+        vals = vals.append({"state": row["state"], "date": row["date"], "doses": 0}, ignore_index=True)
+
+
+vals = vals.drop_duplicates(subset=['state', "date"])
+
+
+#### Merge past merge with vaccine data ####
+data = allData.merge(vals, how="left", on=["state", "date"])
+data.to_csv("Online_Education_And_Covid.csv", index=False)
