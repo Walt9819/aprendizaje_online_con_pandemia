@@ -34,6 +34,8 @@ for file in os.listdir("rawData/onlinelearning/engagement_data"):
     aggData["state"] = state # add state to df
     allOnline = allOnline.append(aggData) # add values to df
 
+# Change 'District Of Columbia' to match with other df
+allOnline["state"].replace({"District Of Columbia": "District of Columbia"}, inplace=True)
 
 #### COVID-19 cases ####
 ## Create new dataframe where all information will be placed
@@ -48,9 +50,35 @@ for file in os.listdir("rawData/csse_covid_19_daily_reports_us"):
     data = pd.read_csv(f"rawData/csse_covid_19_daily_reports_us/{file}")
     # Select desired columns
     data = data[["Province_State", "Confirmed", "Deaths", "Recovered", "Active"]]
-    data["date"] = date.strftime("%m-%d_%Y") # add date as column
+    data["date"] = date.strftime("%Y-%m-%d") # add date as column
     data.columns = ["state", "confirmed", "deaths", "recovered", "active", "date"]
-    if "Recovered" in data["state"]:
-        print(data)
     allCases = allCases.append(data) # add rows to df
 
+
+# display states not in both df
+un = allCases["state"].unique()
+for state in allOnline["state"].unique():
+    if state not in un:
+        print(state)
+
+
+#### Merge online with cases ####
+#allData = allOnline.merge(allCases, left_on=["state", "date"], right_on=["state", "date"])
+allData = allOnline.merge(allCases, how="inner", on=["state", "date"])
+
+vac = pd.read_csv("rawData/time_series_covid19_vaccine_doses_admin_US.csv")
+# delete undesired columns
+vac = vac.drop(['UID', 'iso2', 'iso3', 'code3', 'FIPS', 'Admin2', 'Country_Region', 'Lat', 'Long_', 'Combined_Key'], axis=1)
+vac_states = vac["Province_State"].unique()
+vac_cols = vac.columns.tolist()
+
+vals = pd.DataFrame(columns=["State", "Doses", "Population"]) # all rows to be added
+for index, row in allData.iterrows():
+    if row["state"] in vac_states and row["date"] in vac_cols:
+        thisRow = vac[vac["Province_State"] == row["state"]]
+        doses = thisRow[row["date"]]
+        try:
+            doses = int(doses)
+        except:
+            doses = 0
+        vals = vals.append({"state": row["state"], "doses": doses, "population": thisRow["Population"]})
